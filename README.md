@@ -3,7 +3,7 @@ Unstately
 
 Unstately is a very simple state machine implementation in C++17.
 
-Its aim it is to provide an example of how to write a state machine without switch cases, nor transition tables.
+Its aim is to provide an example of how to write a state machine without switch cases, nor transition tables.
 It does not claim to be production-ready.
 If you are looking for a more mature, perfomant, and featured state machine implementation, you may want to take a look to [TinyFSM](https://github.com/digint/tinyfsm).
 
