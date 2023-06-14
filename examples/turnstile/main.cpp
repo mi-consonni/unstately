@@ -1,10 +1,16 @@
 #include <iostream>
+#include <variant>
 
 #include <unstately/unstately.h>
 
 // By default, this example creates states on the heap.
 // Uncomment the following line to create states with static storage instead.
 // #define UNSTATELY_EXAMPLE_TURNSTILE_STATIC
+
+// Define the events.
+struct CoinInserted {};
+struct ArmPushed {};
+using Event = std::variant<ArmPushed, CoinInserted>;
 
 // The `Context` class here represents the application-specific
 // context in which the state machine acts.
@@ -22,11 +28,19 @@ public:
     void beep() {
         std::cout << "Buzzer BEEPED" << '\n';
     }
-};
 
-// Define the events.
-struct CoinInserted {};
-struct ArmPushed {};
+    void push_event(Event&&) {
+        // Push into the event queue.
+    }
+
+    Event pop_event() {
+        // Pop from the event queue (here we use a mock version).
+        static unsigned int counter = 0;
+        auto event = (counter % 2 == 0) ? Event{ArmPushed{}} : Event{CoinInserted{}};
+        counter += 1;
+        return event;
+    }
+};
 
 // Define some useful shortcuts.
 #ifndef UNSTATELY_EXAMPLE_TURNSTILE_STATIC
@@ -90,10 +104,13 @@ void Locked::handle(const CoinInserted&) {
 
 int main() {
     static auto context = Context{};
+
     // Create the state machine with an initial state.
     auto sm = StateMachine{make_state_ptr<Locked>(context)};
+
     // Dispatch the events.
-    sm.dispatch(ArmPushed{});
-    sm.dispatch(CoinInserted{});
-    sm.dispatch(ArmPushed{});
+    for (int i = 0; i < 3; ++i) {
+        auto event = context.pop_event();
+        std::visit([&](auto&& e) { sm.dispatch(e); }, event);
+    }
 }
