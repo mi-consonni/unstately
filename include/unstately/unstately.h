@@ -50,7 +50,7 @@ namespace unstately {
 template <typename E>
 class EventHandlerUnit {
 public:
-    virtual ~EventHandlerUnit<E>() {}
+    virtual ~EventHandlerUnit() = default;
 
     /**
      * @brief Handles an incoming event, possibly requesting a state change via
@@ -68,24 +68,9 @@ public:
  * @tparam EE Type list of the events that the state will handle.
  */
 template <typename... EE>
-class EventHandler;
-
-/**
- * @brief See EventHandler.
- */
-template <>
-class EventHandler<> {
+class EventHandler : public EventHandlerUnit<EE>... {
 public:
-    virtual ~EventHandler<>() {}
-};
-
-/**
- * @brief See EventHandler.
- */
-template <typename E, typename... EE>
-class EventHandler<E, EE...> : public EventHandlerUnit<E>, public EventHandler<EE...> {
-public:
-    virtual ~EventHandler<E, EE...>() {}
+    virtual ~EventHandler() = default;
 };
 
 /**
@@ -105,7 +90,7 @@ public:
 
     State() : next_state_(Ptr{}) {}
 
-    virtual ~State() {}
+    virtual ~State() = default;
 
     State(const State& rhs) = delete;
 
