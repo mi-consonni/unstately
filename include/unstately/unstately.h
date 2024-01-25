@@ -44,7 +44,6 @@ namespace unstately {
 /**
  * @brief The inteface that each application-defined state shall implement to handle a
  *        specific event type.
- *
  * @tparam E The event type to handle.
  */
 template <typename E>
@@ -55,7 +54,6 @@ public:
     /**
      * @brief Handles an incoming event, possibly requesting a state change via
      *        State::request_transition.
-     *
      * @param e Event to handle.
      */
     virtual void handle(const E& e) = 0;
@@ -64,7 +62,6 @@ public:
 /**
  * @brief An intermediate class that allows to inherit multiple instances of EventHandlerUnit.
  *        The application shall not use this class directly but only through State inheritance.
- *
  * @tparam EE Type list of the events that the state will handle.
  */
 template <typename... EE>
@@ -76,8 +73,7 @@ public:
 /**
  * @brief The base class for all the states.
  *        All application-defined states shall inherit from this class.
- *
- * @tparam P  Pointer type to be used to hold the state object.
+ * @tparam P Pointer type to be used to hold the state object.
  * @tparam EE Type list of the events that the state will handle.
  */
 template <template <typename> typename P, typename... EE>
@@ -113,9 +109,8 @@ public:
     /**
      * @brief Reacts to an incoming event.
      *        This method shall usually not be called directly but through a StateMachine.
-     *
-     * @tparam E   Type of the event to react to.
-     * @param e    Event to react to.
+     * @tparam E Type of the event to react to.
+     * @param e Event to react to.
      * @return Ptr Pointer the next state. May be empty if no transition is required.
      */
     template <typename E>
@@ -132,7 +127,6 @@ protected:
      * @brief Sets the next state to be returned by the State::react method.
      *        Application-defined states shall call this method inside their
      *        EventHandlerUnit::handle implementations to trigger a state change.
-     *
      * @param next_state Pointer to the next requested state.
      */
     void request_transition(Ptr&& next_state) {
@@ -146,7 +140,6 @@ private:
 /**
  * @brief The class representing the state machine.
  *        It holds the current state and delegates to it the event handling.
- *
  * @tparam S Base class of the states that this state machine can handle.
  */
 template <typename S>
@@ -164,7 +157,6 @@ public:
 
     /**
      * @brief Constructs a new state machine object initialized with the input initial state.
-     *
      * @param initial_state Initial state to start from. It shall be non null, otherwise the
      *                      behaviour is undefined.
      */
@@ -191,7 +183,6 @@ public:
     /**
      * @brief Dispatches the incoming event, _i.e._, lets the current state
      *        react to the event.
-     *
      * @tparam E Type of the event to dispatch.
      * @param e  Event to dispatch.
      */
@@ -223,14 +214,12 @@ using Ptr = T*;
 
 /**
  * @brief Helper function to create a new unstately::static_ptr::Ptr.
- *
  * @warning When called more than once for any given type T, only the first
  *          call will actually create a new instance. All subsequent calls will return
  *          the previously created instance, thus ignoring any change in the input arguments.
- *
- * @tparam T      Concrete type of the state to create.
- * @tparam Args   Type list of the arguments to forward to T constructor.
- * @param args    Arguments to forward to T constructor.
+ * @tparam T Concrete type of the state to create.
+ * @tparam Args Type list of the arguments to forward to T constructor.
+ * @param args Arguments to forward to T constructor.
  * @return Ptr<T> Pointer to the newly created state.
  */
 template <typename T, typename... Args>
@@ -243,7 +232,6 @@ Ptr<T> make_state_ptr(Args&&... args) {
 
 /**
  * @brief Shortcut for a State type using unstately::static_ptr::Ptr.
- *
  * @tparam EE Type list of the events that the state will handle.
  */
 template <typename... EE>
@@ -256,7 +244,6 @@ namespace unique_ptr {
 
 /**
  * @brief Pointer able to store dynamically created states.
- *
  * @tparam T Type of the pointee object, usually the abstract State class.
  */
 template <typename T>
@@ -264,10 +251,9 @@ using Ptr = std::unique_ptr<T, std::default_delete<T>>;
 
 /**
  * @brief Helper function to create a new unstately::unique_ptr::Ptr.
- *
- * @tparam T      Concrete type of the state to create.
- * @tparam Args   Type list of the arguments to forward to T constructor.
- * @param args    Arguments to forward to T constructor.
+ * @tparam T Concrete type of the state to create.
+ * @tparam Args Type list of the arguments to forward to T constructor.
+ * @param args Arguments to forward to T constructor.
  * @return Ptr<T> Pointer to the newly created state.
  */
 template <typename T, typename... Args>
@@ -279,7 +265,6 @@ Ptr<T> make_state_ptr(Args&&... args) {
 
 /**
  * @brief Shortcut for a State type using unstately::unique_ptr::Ptr.
- *
  * @tparam EE Type list of the events that the state will handle.
  */
 template <typename... EE>
