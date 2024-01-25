@@ -88,7 +88,7 @@ public:
      */
     using Ptr = P<State<P, EE...>>;
 
-    State() : next_state_(Ptr{}) {}
+    explicit State() : next_state_(Ptr{}) {}
 
     virtual ~State() = default;
 
