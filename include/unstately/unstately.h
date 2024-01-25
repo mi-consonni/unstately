@@ -32,7 +32,7 @@
 //! Library major version.
 #define UNSTATELY_VERSION_MAJOR 0
 //! Library minor version.
-#define UNSTATELY_VERSION_MINOR 1
+#define UNSTATELY_VERSION_MINOR 2
 //! Library patch version.
 #define UNSTATELY_VERSION_PATCH 0
 
