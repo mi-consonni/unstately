@@ -1,3 +1,4 @@
+#include <functional>
 #include <iostream>
 #include <variant>
 
@@ -61,7 +62,7 @@ public:
     explicit Locked(Context& context) : context_(context) {}
 
     void entry() override {
-        context_.lock_arm();
+        context_.get().lock_arm();
     }
 
     void exit() override {}
@@ -69,11 +70,11 @@ public:
     void handle(const CoinInserted&) override;
 
     void handle(const ArmPushed&) override {
-        context_.beep();
+        context_.get().beep();
     }
 
 private:
-    Context& context_;
+    std::reference_wrapper<Context> context_;
 };
 
 class Unlocked : public State {
@@ -81,7 +82,7 @@ public:
     explicit Unlocked(Context& context) : context_(context) {}
 
     void entry() override {
-        context_.unlock_arm();
+        context_.get().unlock_arm();
     }
 
     void exit() override {}
@@ -95,7 +96,7 @@ public:
     }
 
 private:
-    Context& context_;
+    std::reference_wrapper<Context> context_;
 };
 
 void Locked::handle(const CoinInserted&) {

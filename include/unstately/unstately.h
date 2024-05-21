@@ -214,9 +214,6 @@ using Ptr = T*;
 
 /**
  * @brief Helper function to create a new unstately::static_ptr::Ptr.
- * @warning When called more than once for any given type T, only the first
- *          call will actually create a new instance. All subsequent calls will return
- *          the previously created instance, thus ignoring any change in the input arguments.
  * @tparam T Concrete type of the state to create.
  * @tparam Args Type list of the arguments to forward to T constructor.
  * @param args Arguments to forward to T constructor.
@@ -224,7 +221,13 @@ using Ptr = T*;
  */
 template <typename T, typename... Args>
 Ptr<T> make_state_ptr(Args&&... args) {
-    static auto instance = T{std::forward<Args>(args)...};
+    static bool first_time = true;
+    static T instance{std::forward<Args>(args)...};
+    if (first_time) {
+        first_time = false;
+    } else {
+        instance = T{std::forward<Args>(args)...};
+    }
     return &instance;
 }
 
