@@ -84,7 +84,7 @@ public:
      */
     using Ptr = P<State<P, EE...>>;
 
-    explicit State() : next_state_(Ptr{}) {}
+    explicit State() = default;
 
     virtual ~State() = default;
 
@@ -134,7 +134,7 @@ protected:
     }
 
 private:
-    Ptr next_state_;
+    Ptr next_state_{};
 };
 
 /**
@@ -160,7 +160,7 @@ public:
      * @param initial_state Initial state to start from. It shall be non null, otherwise the
      *                      behaviour is undefined.
      */
-    explicit StateMachine(StatePtr&& initial_state) : state_(std::move(initial_state)) {
+    explicit StateMachine(StatePtr&& initial_state) : state_{std::move(initial_state)} {
         assert(state_);
         state_->entry();
     }
@@ -196,7 +196,7 @@ public:
     }
 
 private:
-    StatePtr state_;
+    StatePtr state_{};
 };
 
 /**
@@ -250,7 +250,7 @@ namespace unique_ptr {
  * @tparam T Type of the pointee object, usually the abstract State class.
  */
 template <typename T>
-using Ptr = std::unique_ptr<T, std::default_delete<T>>;
+using Ptr = std::unique_ptr<T>;
 
 /**
  * @brief Helper function to create a new unstately::unique_ptr::Ptr.

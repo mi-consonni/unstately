@@ -59,7 +59,7 @@ using unstately::static_ptr::make_state_ptr;
 // (possibly empty).
 class Locked : public State {
 public:
-    explicit Locked(Context& context) : context_(context) {}
+    explicit Locked(Context& context) : context_{context} {}
 
     void entry() override {
         context_.get().lock_arm();
@@ -79,7 +79,7 @@ private:
 
 class Unlocked : public State {
 public:
-    explicit Unlocked(Context& context) : context_(context) {}
+    explicit Unlocked(Context& context) : context_{context} {}
 
     void entry() override {
         context_.get().unlock_arm();
@@ -104,7 +104,7 @@ void Locked::handle(const CoinInserted&) {
 }
 
 int main() {
-    static auto context = Context{};
+    static Context context{};
 
     // Create the state machine with an initial state.
     auto sm = StateMachine{make_state_ptr<Locked>(context)};
