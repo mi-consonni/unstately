@@ -44,9 +44,10 @@ namespace unstately {
 /**
  * @brief The inteface that each application-defined state shall implement to handle a
  *        specific event type.
+ * @tparam C Type of the state machine context.
  * @tparam E The event type to handle.
  */
-template <typename E>
+template <typename C, typename E>
 class EventHandlerUnit {
 public:
     virtual ~EventHandlerUnit() = default;
@@ -54,18 +55,20 @@ public:
     /**
      * @brief Handles an incoming event, possibly requesting a state change via
      *        State::request_transition.
+     * @param c State machine context.
      * @param e Event to handle.
      */
-    virtual void handle(const E& e) = 0;
+    virtual void handle(C& c, const E& e) = 0;
 };
 
 /**
  * @brief An intermediate class that allows to inherit multiple instances of EventHandlerUnit.
  *        The application shall not use this class directly but only through State inheritance.
+ * @tparam C Type of the state machine context.
  * @tparam EE Type list of the events that the state will handle.
  */
-template <typename... EE>
-class EventHandler : public EventHandlerUnit<EE>... {
+template <typename C, typename... EE>
+class EventHandler : public EventHandlerUnit<C, EE>... {
 public:
     virtual ~EventHandler() = default;
 };
@@ -74,15 +77,21 @@ public:
  * @brief The base class for all the states.
  *        All application-defined states shall inherit from this class.
  * @tparam P Pointer type to be used to hold the state object.
+ * @tparam C Type of the state machine context.
  * @tparam EE Type list of the events that the state will handle.
  */
-template <template <typename> typename P, typename... EE>
-class State : public EventHandler<EE...> {
+template <template <typename> typename P, typename C, typename... EE>
+class State : public EventHandler<C, EE...> {
 public:
     /**
      * @brief Pointer type used to return the next requested state.
      */
-    using Ptr = P<State<P, EE...>>;
+    using Ptr = P<State<P, C, EE...>>;
+
+    /**
+     * @brief Type of the state machine context.
+     */
+    using Context = C;
 
     explicit State() = default;
 
@@ -98,25 +107,28 @@ public:
 
     /**
      * @brief Entry action to be implemented by application-defined states.
+     * @param c State machine context.
      */
-    virtual void entry() = 0;
+    virtual void entry(C& c) = 0;
 
     /**
      * @brief Exit action to be implemented by application-defined states.
+     * @param c State machine context.
      */
-    virtual void exit() = 0;
+    virtual void exit(C& c) = 0;
 
     /**
      * @brief Reacts to an incoming event.
      *        This method shall usually not be called directly but through a StateMachine.
      * @tparam E Type of the event to react to.
+     * @param c State machine context.
      * @param e Event to react to.
      * @return Ptr Pointer the next state. May be empty if no transition is required.
      */
     template <typename E>
-    Ptr react(const E& e) {
-        EventHandlerUnit<E>& handler = *this;
-        handler.handle(e);
+    Ptr react(C& c, const E& e) {
+        EventHandlerUnit<C, E>& handler = *this;
+        handler.handle(c, e);
         auto next_state = std::move(next_state_);
         next_state_ = Ptr{};
         return next_state;
@@ -156,19 +168,26 @@ public:
     using StatePtr = typename State::Ptr;
 
     /**
+     * @brief Type of the state machine context.
+     */
+    using Context = typename State::Context;
+
+    /**
      * @brief Constructs a new state machine object initialized with the input initial state.
+     * @param context       State machine context.
      * @param initial_state Initial state to start from. It shall be non null, otherwise the
      *                      behaviour is undefined.
      */
-    explicit StateMachine(StatePtr&& initial_state) : state_{std::move(initial_state)} {
+    explicit StateMachine(Context&& context, StatePtr&& initial_state)
+        : context_{std::move(context)}, state_{std::move(initial_state)} {
         assert(state_);
-        state_->entry();
+        state_->entry(context_);
     }
 
     ~StateMachine() {
         // Non-null check is needed because the object may have been moved
         if (state_) {
-            state_->exit();
+            state_->exit(context_);
         }
     }
 
@@ -188,14 +207,15 @@ public:
      */
     template <typename E>
     void dispatch(const E& e) {
-        if (auto next_state = state_->react(e)) {
-            state_->exit();
+        if (auto next_state = state_->react(context_, e)) {
+            state_->exit(context_);
             state_ = std::move(next_state);
-            state_->entry();
+            state_->entry(context_);
         }
     }
 
 private:
+    Context context_{};
     StatePtr state_{};
 };
 
@@ -235,10 +255,11 @@ Ptr<T> make_state_ptr(Args&&... args) {
 
 /**
  * @brief Shortcut for a State type using unstately::static_ptr::Ptr.
+ * @tparam C Type of the state machine context.
  * @tparam EE Type list of the events that the state will handle.
  */
-template <typename... EE>
-using StaticState = State<static_ptr::Ptr, EE...>;
+template <typename C, typename... EE>
+using StaticState = State<static_ptr::Ptr, C, EE...>;
 
 /**
  * @brief Collection of utilities to manage dynamically created states.
@@ -268,10 +289,11 @@ Ptr<T> make_state_ptr(Args&&... args) {
 
 /**
  * @brief Shortcut for a State type using unstately::unique_ptr::Ptr.
+ * @tparam C Type of the state machine context.
  * @tparam EE Type list of the events that the state will handle.
  */
-template <typename... EE>
-using UniqueState = State<unique_ptr::Ptr, EE...>;
+template <typename C, typename... EE>
+using UniqueState = State<unique_ptr::Ptr, C, EE...>;
 
 } // namespace unstately
 

@@ -1,17 +1,12 @@
-#include <functional>
 #include <iostream>
 #include <variant>
+#include <vector>
 
 #include <unstately/unstately.h>
 
 // By default, this example creates states on the heap.
 // Uncomment the following line to create states with static storage instead.
 // #define UNSTATELY_EXAMPLE_TURNSTILE_STATIC
-
-// Define the events.
-struct CoinInserted {};
-struct ArmPushed {};
-using Event = std::variant<ArmPushed, CoinInserted>;
 
 // The `Context` class here represents the application-specific
 // context in which the state machine acts.
@@ -29,27 +24,20 @@ public:
     void beep() {
         std::cout << "Buzzer BEEPED" << '\n';
     }
-
-    void push_event(Event&&) {
-        // Push into the event queue.
-    }
-
-    Event pop_event() {
-        // Pop from the event queue (here we use a mock version).
-        static unsigned int counter = 0;
-        auto event = (counter % 2 == 0) ? Event{ArmPushed{}} : Event{CoinInserted{}};
-        counter += 1;
-        return event;
-    }
 };
+
+// Define the events.
+struct CoinInserted {};
+struct ArmPushed {};
+using Event = std::variant<ArmPushed, CoinInserted>;
 
 // Define some useful shortcuts.
 #ifndef UNSTATELY_EXAMPLE_TURNSTILE_STATIC
-using State = unstately::UniqueState<CoinInserted, ArmPushed>;
+using State = unstately::UniqueState<Context, CoinInserted, ArmPushed>;
 using StateMachine = unstately::StateMachine<State>;
 using unstately::unique_ptr::make_state_ptr;
 #else
-using State = unstately::StaticState<CoinInserted, ArmPushed>;
+using State = unstately::StaticState<Context, CoinInserted, ArmPushed>;
 using StateMachine = unstately::StateMachine<State>;
 using unstately::static_ptr::make_state_ptr;
 #endif
@@ -59,59 +47,53 @@ using unstately::static_ptr::make_state_ptr;
 // (possibly empty).
 class Locked : public State {
 public:
-    explicit Locked(Context& context) : context_{context} {}
-
-    void entry() override {
-        context_.get().lock_arm();
+    void entry(Context& context) override {
+        context.lock_arm();
     }
 
-    void exit() override {}
+    void exit(Context&) override {}
 
-    void handle(const CoinInserted&) override;
+    void handle(Context&, const CoinInserted&) override;
 
-    void handle(const ArmPushed&) override {
-        context_.get().beep();
+    void handle(Context& context, const ArmPushed&) override {
+        context.beep();
     }
-
-private:
-    std::reference_wrapper<Context> context_;
 };
 
 class Unlocked : public State {
 public:
-    explicit Unlocked(Context& context) : context_{context} {}
-
-    void entry() override {
-        context_.get().unlock_arm();
+    void entry(Context& context) override {
+        context.unlock_arm();
     }
 
-    void exit() override {}
+    void exit(Context&) override {}
 
-    void handle(const CoinInserted&) override {}
+    void handle(Context&, const CoinInserted&) override {}
 
-    void handle(const ArmPushed&) override {
+    void handle(Context&, const ArmPushed&) override {
         // Request transition to another state. The transition will be executed
         // by the state machine when this function returns.
-        request_transition(make_state_ptr<Locked>(context_));
+        request_transition(make_state_ptr<Locked>());
     }
-
-private:
-    std::reference_wrapper<Context> context_;
 };
 
-void Locked::handle(const CoinInserted&) {
-    request_transition(make_state_ptr<Unlocked>(context_));
+void Locked::handle(Context&, const CoinInserted&) {
+    request_transition(make_state_ptr<Unlocked>());
 }
 
 int main() {
-    static Context context{};
+    // Emulate an event queue.
+    std::vector<Event> event_queue = {
+        ArmPushed{},
+        CoinInserted{},
+        ArmPushed{},
+    };
 
     // Create the state machine with an initial state.
-    auto sm = StateMachine{make_state_ptr<Locked>(context)};
+    auto sm = StateMachine{Context{}, make_state_ptr<Locked>()};
 
     // Dispatch the events.
-    for (int i = 0; i < 3; ++i) {
-        auto event = context.pop_event();
+    for (const auto& event : event_queue) {
         std::visit([&](auto&& e) { sm.dispatch(e); }, event);
     }
 }
