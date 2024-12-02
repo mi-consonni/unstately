@@ -103,11 +103,11 @@ public:
 
     State(const State& rhs) = delete;
 
-    State(State&& rhs) = default;
+    State(State&& rhs) noexcept = default;
 
     State& operator=(const State& rhs) = delete;
 
-    State& operator=(State&& rhs) = default;
+    State& operator=(State&& rhs) noexcept = default;
 
     /**
      * @brief Entry action to be implemented by application-defined states.
@@ -216,11 +216,11 @@ public:
 
     StateMachine(const StateMachine& rhs) = delete;
 
-    StateMachine(StateMachine&& rhs) = default;
+    StateMachine(StateMachine&& rhs) noexcept = default;
 
     StateMachine& operator=(const StateMachine& rhs) = delete;
 
-    StateMachine& operator=(StateMachine&& rhs) = default;
+    StateMachine& operator=(StateMachine&& rhs) noexcept = default;
 
     /**
      * @brief Dispatches the incoming event, _i.e._, lets the current state
