@@ -25,7 +25,6 @@
 #ifndef UNSTATELY_UNSTATELY_H_
 #define UNSTATELY_UNSTATELY_H_
 
-#include <cassert>
 #include <memory>
 #include <utility>
 
@@ -76,22 +75,27 @@ public:
 /**
  * @brief The base class for all the states.
  *        All application-defined states shall inherit from this class.
- * @tparam P Pointer type to be used to hold the state object.
+ * @tparam A Type of the allocator to be used to create new states.
  * @tparam C Type of the state machine context.
  * @tparam EE Type list of the events that the state will handle.
  */
-template <template <typename> typename P, typename C, typename... EE>
+template <typename A, typename C, typename... EE>
 class State : public EventHandler<C, EE...> {
 public:
     /**
-     * @brief Pointer type used to return the next requested state.
+     * @brief Allocation policy type used to create new states.
      */
-    using Ptr = P<State<P, C, EE...>>;
+    using Allocator = A;
 
     /**
      * @brief Type of the state machine context.
      */
     using Context = C;
+
+    /**
+     * @brief Pointer type used to return the next requested state.
+     */
+    using Ptr = typename Allocator::Ptr<State<A, C, EE...>>;
 
     explicit State() = default;
 
@@ -129,9 +133,7 @@ public:
     Ptr react(C& c, const E& e) {
         EventHandlerUnit<C, E>& handler = *this;
         handler.handle(c, e);
-        auto next_state = std::move(next_state_);
-        next_state_ = Ptr{};
-        return next_state;
+        return std::exchange(next_state_, Ptr{});
     }
 
 protected:
@@ -139,10 +141,25 @@ protected:
      * @brief Sets the next state to be returned by the State::react method.
      *        Application-defined states shall call this method inside their
      *        EventHandlerUnit::handle implementations to trigger a state change.
-     * @param next_state Pointer to the next requested state.
+     * @tparam T Concrete type of the next state.
+     * @param next_state Next requested state.
      */
-    void request_transition(Ptr&& next_state) {
-        next_state_ = std::move(next_state);
+    template <typename T>
+    void request_transition(T&& next_state) {
+        next_state_ = Allocator::template make_state_ptr<T>(std::move(next_state));
+    }
+
+    /**
+     * @brief Sets the next state to be returned by the State::react method.
+     *        Application-defined states shall call this method inside their
+     *        EventHandlerUnit::handle implementations to trigger a state change.
+     * @tparam T Concrete type of the next state.
+     * @tparam Args Type list of the arguments to forward to T constructor.
+     * @param args Arguments to forward to T constructor.
+     */
+    template <typename T, typename... Args>
+    void request_transition(Args&&... args) {
+        next_state_ = Allocator::template make_state_ptr<T>(std::forward<Args>(args)...);
     }
 
 private:
@@ -163,9 +180,9 @@ public:
     using State = S;
 
     /**
-     * @brief Pointer type used to store the current state.
+     * @brief Allocation policy type used to create new states.
      */
-    using StatePtr = typename State::Ptr;
+    using StateAllocator = typename State::Allocator;
 
     /**
      * @brief Type of the state machine context.
@@ -173,14 +190,20 @@ public:
     using Context = typename State::Context;
 
     /**
-     * @brief Constructs a new state machine object initialized with the input initial state.
-     * @param context       State machine context.
-     * @param initial_state Initial state to start from. It shall be non null, otherwise the
-     *                      behaviour is undefined.
+     * @brief Pointer type used to store the current state.
      */
-    explicit StateMachine(Context&& context, StatePtr&& initial_state)
-        : context_{std::move(context)}, state_{std::move(initial_state)} {
-        assert(state_);
+    using StatePtr = typename State::Ptr;
+
+    /**
+     * @brief Constructs a new state machine object initialized with the input initial state.
+     * @tparam T Concrete type of the initial state.
+     * @param context       State machine context.
+     * @param initial_state Initial state to start from.
+     */
+    template <typename T>
+    explicit StateMachine(Context&& context, T&& initial_state)
+        : context_{std::move(context)},
+          state_{StateAllocator::template make_state_ptr<T>(std::move(initial_state))} {
         state_->entry(context_);
     }
 
@@ -220,80 +243,83 @@ private:
 };
 
 /**
- * @brief Collection of utilities to manage statically created states.
+ * @brief A state allocation policy that stores states as static variables.
+ *        Notice: concrete state classes shall implement an empty constructor and the
+ *        move assignment operator.
  */
-namespace static_ptr {
+class StaticStateAllocator {
+public:
+    /**
+     * @brief Pointer able to store statically-allocated states.
+     * @tparam T Type of the pointee object, usually the abstract State class.
+     */
+    template <typename T>
+    using Ptr = T*;
 
-/**
- * @brief Pointer able to store statically created states.
- *
- * @tparam T Type of the pointee object, usually the abstract State class.
- */
-template <typename T>
-using Ptr = T*;
-
-/**
- * @brief Helper function to create a new unstately::static_ptr::Ptr.
- * @tparam T Concrete type of the state to create.
- * @tparam Args Type list of the arguments to forward to T constructor.
- * @param args Arguments to forward to T constructor.
- * @return Ptr<T> Pointer to the newly created state.
- */
-template <typename T, typename... Args>
-Ptr<T> make_state_ptr(Args&&... args) {
-    static bool first_time = true;
-    static T instance{std::forward<Args>(args)...};
-    if (first_time) {
-        first_time = false;
-    } else {
+    /**
+     * @brief Helper function to create a new statically-allocated state.
+     * @tparam T Concrete type of the state to create.
+     * @tparam Args Type list of the arguments to forward to T constructor.
+     * @param args Arguments to forward to T constructor.
+     * @return Ptr<T> Pointer to the newly created state.
+     */
+    template <typename T, typename... Args>
+    static Ptr<T> make_state_ptr(Args&&... args) {
+        T& instance = get_state_instance<T>();
         instance = T{std::forward<Args>(args)...};
+        return &instance;
     }
-    return &instance;
-}
 
-} // namespace static_ptr
+private:
+    template <typename T>
+    static T& get_state_instance() {
+        static T instance{};
+        return instance;
+    }
+};
 
 /**
- * @brief Shortcut for a State type using unstately::static_ptr::Ptr.
+ * @brief A state allocation policy that stores states on the heap.
+ */
+class UniqueStateAllocator {
+public:
+    /**
+     * @brief Pointer able to store dynamically-allocated states.
+     * @tparam T Type of the pointee object, usually the abstract State class.
+     */
+    template <typename T>
+    using Ptr = std::unique_ptr<T>;
+
+    /**
+     * @brief Helper function to create a new dinamically-allocated state.
+     * @tparam T Concrete type of the state to create.
+     * @tparam Args Type list of the arguments to forward to T constructor.
+     * @param args Arguments to forward to T constructor.
+     * @return Ptr<T> Pointer to the newly created state.
+     */
+    template <typename T, typename... Args>
+    static Ptr<T> make_state_ptr(Args&&... args) {
+        return std::make_unique<T>(std::forward<Args>(args)...);
+    }
+};
+
+/**
+ * @brief Shortcut for a State type using static allocation policy.
+ *        Notice: concrete state classes shall implement an empty constructor and the
+ *        move assignment operator.
  * @tparam C Type of the state machine context.
  * @tparam EE Type list of the events that the state will handle.
  */
 template <typename C, typename... EE>
-using StaticState = State<static_ptr::Ptr, C, EE...>;
+using StaticState = State<StaticStateAllocator, C, EE...>;
 
 /**
- * @brief Collection of utilities to manage dynamically created states.
- */
-namespace unique_ptr {
-
-/**
- * @brief Pointer able to store dynamically created states.
- * @tparam T Type of the pointee object, usually the abstract State class.
- */
-template <typename T>
-using Ptr = std::unique_ptr<T>;
-
-/**
- * @brief Helper function to create a new unstately::unique_ptr::Ptr.
- * @tparam T Concrete type of the state to create.
- * @tparam Args Type list of the arguments to forward to T constructor.
- * @param args Arguments to forward to T constructor.
- * @return Ptr<T> Pointer to the newly created state.
- */
-template <typename T, typename... Args>
-Ptr<T> make_state_ptr(Args&&... args) {
-    return std::make_unique<T>(std::forward<Args>(args)...);
-}
-
-} // namespace unique_ptr
-
-/**
- * @brief Shortcut for a State type using unstately::unique_ptr::Ptr.
+ * @brief Shortcut for a State type using dynamic allocation policy.
  * @tparam C Type of the state machine context.
  * @tparam EE Type list of the events that the state will handle.
  */
 template <typename C, typename... EE>
-using UniqueState = State<unique_ptr::Ptr, C, EE...>;
+using UniqueState = State<UniqueStateAllocator, C, EE...>;
 
 } // namespace unstately
 

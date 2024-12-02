@@ -35,11 +35,9 @@ using Event = std::variant<ArmPushed, CoinInserted>;
 #ifndef UNSTATELY_EXAMPLE_TURNSTILE_STATIC
 using State = unstately::UniqueState<Context, CoinInserted, ArmPushed>;
 using StateMachine = unstately::StateMachine<State>;
-using unstately::unique_ptr::make_state_ptr;
 #else
 using State = unstately::StaticState<Context, CoinInserted, ArmPushed>;
 using StateMachine = unstately::StateMachine<State>;
-using unstately::static_ptr::make_state_ptr;
 #endif
 
 // Every state must derive from `State` and shall, thus,
@@ -73,12 +71,13 @@ public:
     void handle(Context&, const ArmPushed&) override {
         // Request transition to another state. The transition will be executed
         // by the state machine when this function returns.
-        request_transition(make_state_ptr<Locked>());
+        request_transition(Locked{});
     }
 };
 
 void Locked::handle(Context&, const CoinInserted&) {
-    request_transition(make_state_ptr<Unlocked>());
+    // Alternative syntax to request the transition to another state.
+    request_transition<Unlocked>();
 }
 
 int main() {
@@ -90,7 +89,7 @@ int main() {
     };
 
     // Create the state machine with an initial state.
-    auto sm = StateMachine{Context{}, make_state_ptr<Locked>()};
+    auto sm = StateMachine{Context{}, Locked{}};
 
     // Dispatch the events.
     for (const auto& event : event_queue) {
