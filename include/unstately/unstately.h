@@ -250,11 +250,20 @@ private:
 class StaticStateAllocator {
 public:
     /**
+     * @brief Deleter class for Ptr.
+     * @tparam T Type of the pointee object, usually the abstract State class.
+     */
+    class Deleter {
+    public:
+        void operator()(void*) const {}
+    };
+
+    /**
      * @brief Pointer able to store statically-allocated states.
      * @tparam T Type of the pointee object, usually the abstract State class.
      */
     template <typename T>
-    using Ptr = T*;
+    using Ptr = std::unique_ptr<T, Deleter>;
 
     /**
      * @brief Helper function to create a new statically-allocated state.
@@ -267,7 +276,7 @@ public:
     static Ptr<T> make_state_ptr(Args&&... args) {
         T& instance = get_state_instance<T>();
         instance = T{std::forward<Args>(args)...};
-        return &instance;
+        return Ptr<T>{&instance};
     }
 
 private:
